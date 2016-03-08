@@ -1,0 +1,42 @@
+#/bin/bash
+# Andy.Paton@gmail.com
+# 0.1 8MAR2016
+
+# Check_MK Plugin - Solaris NFS
+# Server check already exists for Linux and Aix agents.
+
+# NFS is prone to hangs when it breaks, must use timeout command
+# timeout and stat commands are installed as default on Solaris 11
+# For Solaris 8/9/10 install GNU coreutils from Unixpackages.com or OpenCSW
+
+# Code Overview
+# Set the correct paths for key utils
+# Check paths exist and are executable
+# Parse mnttab and list NFS mountpoints ignoring /vol which is used by VOLD
+# Check status of each nfs file system, wrapped with a timeout of 9 seconds
+
+# Some code taken from Check_MK Linux agent and modified for Solaris
+
+# MAIN
+case "`uname -r`" in
+
+5.11) TPATH="/usr/bin/timeout"
+      SPATH="/usr/bin/stat"
+      ;;
+
+*)    TPATH="/usr/local/bin/timeout"
+      SPATH="/usr/local/bin/stat"
+      ;;
+esac
+
+if [[ -x ${TPATH} ]]  && [[ -x  ${SPATH} ]]  ; then
+    echo "<<<nfsmounts>>>"
+    /usr/bin/awk '$3 == "nfs" {print $2}' /etc/mnttab | grep -v "/vol$" |  
+    while read MP
+    do
+         ${TPATH} 9 ${SPATH} -f -c "${MP} ok %b %f %a %s" ${MP} ||
+         echo "$MP hanging 0 0 0 0"
+    done
+fi
+
+exit 0
